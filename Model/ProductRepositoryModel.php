@@ -141,40 +141,8 @@ class ProductRepositoryModel implements ProductRepositoryInterface
      */
     protected function getBestsellers($condition, ProductSearchCriteriaInterface $searchCriteria)
     {
-        $pageSize = (int)$searchCriteria->getPageSize();
-        $page     = (int)$searchCriteria->getCurrentPage();
-        $storeId  = (int)$this->storeManager->getStore()->getId();
-
-        $this->productCollection
-            ->clear()
-            ->setPageSize($pageSize)
-            ->setCurPage($page);
-
-        // add attributes to filtering
-        $creteria    = $this->searchCriteriaBuilder->create();
-        $attributes  = $this->metadataService->getList($creteria)->getItems();
-        $allowedAttr = [];
-
-        foreach ($attributes as $attribute) {
-            /** @var \Magento\Catalog\Model\ResourceModel\Eav\Attribute $attribute */
-            $code               = $attribute->getAttributeCode();
-            $allowedAttr[$code] = $attribute;
-        }
-
-        foreach ($searchCriteria->getFilterGroups() as $filterGroup) {
-            foreach ($filterGroup->getFilters() as $filter) {
-                if (in_array($filter->getField(), array_keys($allowedAttr), true)) {
-                    // add this attribute to join list and filter
-                    $attribute = $allowedAttr[$filter->getField()];
-                    $this->productCollection->joinAttribute($filter->getField(), $attribute, 'entity_id', null, 'inner');
-
-                    $this->productCollection->addAttributeToFilter(
-                        $filter->getField(),
-                        $filter->getValue()
-                    );
-                }
-            }
-        }
+        $storeId = (int)$this->storeManager->getStore()->getId();
+        $this->prepareProductCollection($searchCriteria);
 
         $joinCond = [
             'store_id'      => ['eq' => $storeId],
@@ -194,15 +162,7 @@ class ProductRepositoryModel implements ProductRepositoryInterface
             ->addOrder('rating_post', Collection::SORT_ORDER_ASC)
             ->groupByAttribute('entity_id');
 
-        $items = $this->productCollection->walk(function ($item) {
-            /** @var \Magento\Catalog\Model\Product $item */
-            $productId = $item->getId();
-            $product   = $this->products->getById($productId);
-
-            return $product;
-        });
-
-        $result = $this->process($items, $searchCriteria, $this->productCollection->getSize());
+        $result = $this->processProductCollection($searchCriteria);
 
         return $result;
     }
@@ -214,43 +174,8 @@ class ProductRepositoryModel implements ProductRepositoryInterface
      */
     public function getRatedProducts(ProductSearchCriteriaInterface $searchCriteria)
     {
-        $pageSize = (int)$searchCriteria->getPageSize();
-        $page     = (int)$searchCriteria->getCurrentPage();
-        $storeId  = (int)$this->storeManager->getStore()->getId();
-
-        $this->productCollection
-            ->clear()
-            ->setPageSize($pageSize)
-            ->setCurPage($page);
-
-        $this->productCollection->joinAttribute('status', 'catalog_product/status', 'entity_id', null, 'inner');
-        $this->productCollection->joinAttribute('visibility', 'catalog_product/visibility', 'entity_id', null, 'inner');
-
-        // add attributes to filtering
-        $creteria    = $this->searchCriteriaBuilder->create();
-        $attributes  = $this->metadataService->getList($creteria)->getItems();
-        $allowedAttr = [];
-
-        foreach ($attributes as $attribute) {
-            /** @var \Magento\Catalog\Model\ResourceModel\Eav\Attribute $attribute */
-            $code               = $attribute->getAttributeCode();
-            $allowedAttr[$code] = $attribute;
-        }
-
-        foreach ($searchCriteria->getFilterGroups() as $filterGroup) {
-            foreach ($filterGroup->getFilters() as $filter) {
-                if (in_array($filter->getField(), array_keys($allowedAttr), true)) {
-                    // add this attribute to join list and filter
-                    $attribute = $allowedAttr[$filter->getField()];
-                    $this->productCollection->joinAttribute($filter->getField(), $attribute, 'entity_id', null, 'inner');
-
-                    $this->productCollection->addAttributeToFilter(
-                        $filter->getField(),
-                        $filter->getValue()
-                    );
-                }
-            }
-        }
+        $storeId = (int)$this->storeManager->getStore()->getId();
+        $this->prepareProductCollection($searchCriteria);
 
         $joinCond = [
             'store_id' => ['eq' => $storeId],
@@ -283,6 +208,62 @@ class ProductRepositoryModel implements ProductRepositoryInterface
             ->addOrder('vote_value_sum', Collection::SORT_ORDER_DESC)
             ->groupByAttribute('entity_id');
 
+
+
+        $result = $this->processProductCollection($searchCriteria);
+
+        return $result;
+    }
+
+    /**
+     * @param ProductSearchCriteriaInterface $searchCriteria
+     */
+    protected function prepareProductCollection(ProductSearchCriteriaInterface $searchCriteria)
+    {
+        $pageSize = (int)$searchCriteria->getPageSize();
+        $page     = (int)$searchCriteria->getCurrentPage();
+
+        $this->productCollection
+            ->clear()
+            ->setPageSize($pageSize)
+            ->setCurPage($page);
+
+        // add attributes to filtering
+        $criteria    = $this->searchCriteriaBuilder->create();
+        $attributes  = $this->metadataService->getList($criteria)->getItems();
+        $allowedAttr = [];
+
+        foreach ($attributes as $attribute) {
+            /** @var \Magento\Catalog\Model\ResourceModel\Eav\Attribute $attribute */
+            $code               = $attribute->getAttributeCode();
+            $allowedAttr[$code] = $attribute;
+        }
+
+        foreach ($searchCriteria->getFilterGroups() as $filterGroup) {
+            foreach ($filterGroup->getFilters() as $filter) {
+                if (in_array($filter->getField(), array_keys($allowedAttr), true)) {
+                    // add this attribute to join list and filter
+                    $attribute = $allowedAttr[$filter->getField()];
+                    $this->productCollection->joinAttribute($filter->getField(), $attribute, 'entity_id', null, 'inner');
+
+                    $this->productCollection->addAttributeToFilter(
+                        $filter->getField(),
+                        $filter->getValue()
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Prepare response
+     *
+     * @param \OxCom\MagentoTopProducts\Api\ProductSearchCriteriaInterface $searchCriteria
+     *
+     * @return \OxCom\MagentoTopProducts\Model\ProductSearchResults
+     */
+    protected function processProductCollection(ProductSearchCriteriaInterface $searchCriteria)
+    {
         $items = $this->productCollection->walk(function ($item) {
             /** @var \Magento\Catalog\Model\Product $item */
             $productId = $item->getId();
@@ -291,26 +272,10 @@ class ProductRepositoryModel implements ProductRepositoryInterface
             return $product;
         });
 
-        $result = $this->process($items, $searchCriteria, $this->productCollection->getSize());
-
-        return $result;
-    }
-
-    /**
-     * Prepare response
-     *
-     * @param                                                              $items
-     * @param \OxCom\MagentoTopProducts\Api\ProductSearchCriteriaInterface $searchCriteria
-     * @param                                                              $size
-     *
-     * @return \OxCom\MagentoTopProducts\Model\ProductSearchResults
-     */
-    protected function process($items, ProductSearchCriteriaInterface $searchCriteria, $size)
-    {
         $result = new ProductSearchResults();
         $result->setItems($items)
             ->setSearchCriteria($searchCriteria)
-            ->setTotalCount($size);
+            ->setTotalCount($this->productCollection->getSize());
 
         return $result;
     }
