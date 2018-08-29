@@ -7,6 +7,7 @@ use Magento\Framework\Data\Collection;
 use Magento\Sales\Model\ResourceModel\Report\Bestsellers\Collection as Bestsellers;
 use Magento\Store\Model\StoreManager;
 use Magento\Review\Model\ResourceModel\Rating\Collection as Rating;
+use Magento\Catalog\Model\ResourceModel\Product\Collection as ProductCollection;
 use OxCom\MagentoTopProducts\Model\ResourceModel\Rating\Option\Aggregated\Collection as RatingAggregated;
 use OxCom\MagentoTopProducts\Api\ProductRepositoryInterface;
 use OxCom\MagentoTopProducts\Api\ProductSearchCriteriaInterface;
@@ -29,6 +30,11 @@ class ProductRepositoryModel implements ProductRepositoryInterface
     protected $products;
 
     /**
+     * @var \Magento\Catalog\Model\ResourceModel\Product\Collection
+     */
+    protected $productCollection;
+
+    /**
      * @var \Magento\Review\Model\ResourceModel\Rating\Collection
      */
     protected $rating;
@@ -44,26 +50,45 @@ class ProductRepositoryModel implements ProductRepositoryInterface
     protected $storeManager;
 
     /**
+     * @var \Magento\Catalog\Api\ProductAttributeRepositoryInterface
+     */
+    protected $metadataService;
+
+    /**
+     * @var \Magento\Framework\Api\SearchCriteriaBuilder
+     */
+    protected $searchCriteriaBuilder;
+
+    /**
      * Repository constructor.
      *
      * @param \Magento\Sales\Model\ResourceModel\Report\Bestsellers\Collection                  $bestsellers
      * @param \Magento\Catalog\Model\ProductRepository                                          $products
+     * @param \Magento\Catalog\Model\ResourceModel\Product\Collection                           $productCollection
      * @param \Magento\Store\Model\StoreManager                                                 $storeManager
      * @param \Magento\Review\Model\ResourceModel\Rating\Collection                             $rating
      * @param \OxCom\MagentoTopProducts\Model\ResourceModel\Rating\Option\Aggregated\Collection $ratingAggregated
+     * @param \Magento\Catalog\Api\ProductAttributeRepositoryInterface                          $metadataServiceInterface
+     * @param \Magento\Framework\Api\SearchCriteriaBuilder                                      $searchCriteriaBuilder
      */
     public function __construct(
         Bestsellers $bestsellers,
         ProductRepository $products,
+        ProductCollection $productCollection,
         StoreManager $storeManager,
         Rating $rating,
-        RatingAggregated $ratingAggregated
+        RatingAggregated $ratingAggregated,
+        \Magento\Catalog\Api\ProductAttributeRepositoryInterface $metadataServiceInterface,
+        \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder
     ) {
-        $this->bestsellers      = $bestsellers;
-        $this->products         = $products;
-        $this->storeManager     = $storeManager;
-        $this->rating           = $rating;
-        $this->ratingAggregated = $ratingAggregated;
+        $this->bestsellers           = $bestsellers;
+        $this->products              = $products;
+        $this->productCollection     = $productCollection;
+        $this->storeManager          = $storeManager;
+        $this->rating                = $rating;
+        $this->ratingAggregated      = $ratingAggregated;
+        $this->metadataService       = $metadataServiceInterface;
+        $this->searchCriteriaBuilder = $searchCriteriaBuilder;
     }
 
     /**
@@ -118,27 +143,66 @@ class ProductRepositoryModel implements ProductRepositoryInterface
     {
         $pageSize = (int)$searchCriteria->getPageSize();
         $page     = (int)$searchCriteria->getCurrentPage();
+        $storeId  = (int)$this->storeManager->getStore()->getId();
 
-        $this->bestsellers
+        $this->productCollection
             ->clear()
-            ->distinct(true)
-            ->setPeriod($searchCriteria->getPeriod())
             ->setPageSize($pageSize)
-            ->setCurPage($page)
-            ->addStoreRestrictions($this->storeManager->getStore()->getId());
+            ->setCurPage($page);
 
-        $this->bestsellers->addFieldToFilter('product_price', [$condition => 0]);
+        // add attributes to filtering
+        $creteria    = $this->searchCriteriaBuilder->create();
+        $attributes  = $this->metadataService->getList($creteria)->getItems();
+        $allowedAttr = [];
 
-        /** @var \Magento\Reports\Model\Item[] $items */
-        $items = $this->bestsellers->walk(function ($item) {
-            /** @var \Magento\Reports\Model\Item $item */
-            $productId = $item->getData('product_id');
+        foreach ($attributes as $attribute) {
+            /** @var \Magento\Catalog\Model\ResourceModel\Eav\Attribute $attribute */
+            $code               = $attribute->getAttributeCode();
+            $allowedAttr[$code] = $attribute;
+        }
+
+        foreach ($searchCriteria->getFilterGroups() as $filterGroup) {
+            foreach ($filterGroup->getFilters() as $filter) {
+                if (in_array($filter->getField(), array_keys($allowedAttr), true)) {
+                    // add this attribute to join list and filter
+                    $attribute = $allowedAttr[$filter->getField()];
+                    $this->productCollection->joinAttribute($filter->getField(), $attribute, 'entity_id', null, 'inner');
+
+                    $this->productCollection->addAttributeToFilter(
+                        $filter->getField(),
+                        $filter->getValue()
+                    );
+                }
+            }
+        }
+
+        $joinCond = [
+            'store_id'      => ['eq' => $storeId],
+            'product_price' => [$condition => 0],
+        ];
+
+        $this->productCollection->joinTable(
+            ['b' => $this->bestsellers->getMainTable()],
+            'product_id = entity_id',
+            [
+                'product_price' => 'product_price',
+            ],
+            $joinCond
+        );
+
+        $this->productCollection
+            ->addOrder('rating_post', Collection::SORT_ORDER_ASC)
+            ->groupByAttribute('entity_id');
+
+        $items = $this->productCollection->walk(function ($item) {
+            /** @var \Magento\Catalog\Model\Product $item */
+            $productId = $item->getId();
             $product   = $this->products->getById($productId);
 
             return $product;
         });
 
-        $result = $this->process($items, $searchCriteria, $this->bestsellers->getSize());
+        $result = $this->process($items, $searchCriteria, $this->productCollection->getSize());
 
         return $result;
     }
@@ -154,11 +218,43 @@ class ProductRepositoryModel implements ProductRepositoryInterface
         $page     = (int)$searchCriteria->getCurrentPage();
         $storeId  = (int)$this->storeManager->getStore()->getId();
 
-        $this->ratingAggregated
+        $this->productCollection
             ->clear()
             ->setPageSize($pageSize)
-            ->setCurPage($page)
-            ->addFieldToFilter('store_id', ['eq' => $storeId]);
+            ->setCurPage($page);
+
+        $this->productCollection->joinAttribute('status', 'catalog_product/status', 'entity_id', null, 'inner');
+        $this->productCollection->joinAttribute('visibility', 'catalog_product/visibility', 'entity_id', null, 'inner');
+
+        // add attributes to filtering
+        $creteria    = $this->searchCriteriaBuilder->create();
+        $attributes  = $this->metadataService->getList($creteria)->getItems();
+        $allowedAttr = [];
+
+        foreach ($attributes as $attribute) {
+            /** @var \Magento\Catalog\Model\ResourceModel\Eav\Attribute $attribute */
+            $code               = $attribute->getAttributeCode();
+            $allowedAttr[$code] = $attribute;
+        }
+
+        foreach ($searchCriteria->getFilterGroups() as $filterGroup) {
+            foreach ($filterGroup->getFilters() as $filter) {
+                if (in_array($filter->getField(), array_keys($allowedAttr), true)) {
+                    // add this attribute to join list and filter
+                    $attribute = $allowedAttr[$filter->getField()];
+                    $this->productCollection->joinAttribute($filter->getField(), $attribute, 'entity_id', null, 'inner');
+
+                    $this->productCollection->addAttributeToFilter(
+                        $filter->getField(),
+                        $filter->getValue()
+                    );
+                }
+            }
+        }
+
+        $joinCond = [
+            'store_id' => ['eq' => $storeId],
+        ];
 
         $code = $searchCriteria->getRatingCode();
         if (!empty($code)) {
@@ -167,24 +263,35 @@ class ProductRepositoryModel implements ProductRepositoryInterface
             if (!empty($rating)) {
                 // there is something like we are searching
                 $id = $rating->getData('rating_id');
-                $this->ratingAggregated->addFieldToFilter('rating_id', ['eq' => $id]);
+                $joinCond['rating_id'] = ['eq' => $id];
             }
         }
 
-        $this->ratingAggregated
-            ->addOrder('percent', Collection::SORT_ORDER_DESC)
-            ->addOrder('vote_value_sum', Collection::SORT_ORDER_DESC);
+        $this->productCollection->joinTable(
+            ['r' => $this->ratingAggregated->getMainTable()],
+            'entity_pk_value = entity_id',
+            [
+                'rating_id'      => 'rating_id',
+                'percent'        => 'percent',
+                'vote_value_sum' => 'vote_value_sum',
+            ],
+            $joinCond
+        );
 
-        /** @var \Magento\Reports\Model\Item[] $items */
-        $items = $this->ratingAggregated->walk(function ($item) {
-            /** @var \Magento\Reports\Model\Item $item */
-            $productId = $item->getData('entity_pk_value');
+        $this->productCollection
+            ->addOrder('percent', Collection::SORT_ORDER_DESC)
+            ->addOrder('vote_value_sum', Collection::SORT_ORDER_DESC)
+            ->groupByAttribute('entity_id');
+
+        $items = $this->productCollection->walk(function ($item) {
+            /** @var \Magento\Catalog\Model\Product $item */
+            $productId = $item->getId();
             $product   = $this->products->getById($productId);
 
             return $product;
         });
 
-        $result = $this->process($items, $searchCriteria, $this->ratingAggregated->getSize());
+        $result = $this->process($items, $searchCriteria, $this->productCollection->getSize());
 
         return $result;
     }

@@ -14,6 +14,21 @@ interface ProductSearchCriteriaInterface
     const PERIOD_DAILY   = 'daily';
 
     /**
+     * Get a list of filter groups.
+     *
+     * @return \Magento\Framework\Api\Search\FilterGroup[]
+     */
+    public function getFilterGroups();
+
+    /**
+     * Set a list of filter groups.
+     *
+     * @param \Magento\Framework\Api\Search\FilterGroup[] $filterGroups
+     * @return $this
+     */
+    public function setFilterGroups(array $filterGroups = null);
+
+    /**
      * Get page size.
      *
      * @return int|null
