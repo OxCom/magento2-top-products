@@ -192,8 +192,7 @@ class ProductRepositoryModel implements ProductRepositoryInterface
         $this->prepareProductCollection($searchCriteria);
 
         $joinCond = [
-            'store_id'      => ['eq' => $storeId],
-            'product_price' => [$condition => 0],
+            'store_id' => ['eq' => $storeId],
         ];
 
         $table = $this->bestsellers->getTableByAggregationPeriod($period);
