@@ -141,6 +141,53 @@ class ProductRepositoryModel implements ProductRepositoryInterface
      */
     protected function getBestsellers($condition, ProductSearchCriteriaInterface $searchCriteria)
     {
+        $allowed = [static::BEST_SELLING_PERIOD_DAILY, static::BEST_SELLING_PERIOD_MONTHLY, static::BEST_SELLING_PERIOD_YEARLY];
+        $period = $searchCriteria->getPeriod();
+        if (!\in_array($period, $allowed, true)) {
+            $period = static::BEST_SELLING_PERIOD_YEARLY;
+        }
+
+        $from = new \DateTime();
+        $to   = new \DateTime();
+
+        switch ($period) {
+            case static::BEST_SELLING_PERIOD_YEARLY:
+                $from->setDate($from->format('Y'), 1, 1);
+                $from->modify('-1 year');
+
+                $to->modify('+1 year');
+                $to->setDate($to->format('Y'), 1, 1);
+                $to->modify('-1 day');
+
+                $range = [
+                    'from' => $from->format('Y-m-d 00:00:00'),
+                    'to'   => $to->format('Y-m-d 23:59:59'),
+                ];
+                break;
+
+            case static::BEST_SELLING_PERIOD_MONTHLY:
+                $from->setDate($from->format('Y'), $from->format('m'), 1);
+                $from->modify('-1 month');
+
+                $to->modify('+1 month');
+                $to->setDate($to->format('Y'), $from->format('m'), 1);
+                $to->modify('-1 day');
+
+                $range = [
+                    'from' => $from->format('Y-m-d 00:00:00'),
+                    'to'   => $to->format('Y-m-d 23:59:59'),
+                ];
+                break;
+
+            case static::BEST_SELLING_PERIOD_DAILY:
+            default:
+                $range = [
+                    'from' => $from->format('Y-m-d 00:00:00'),
+                    'to'   => $to->format('Y-m-d 23:59:59'),
+                ];
+                break;
+        }
+
         $storeId = (int)$this->storeManager->getStore()->getId();
         $this->prepareProductCollection($searchCriteria);
 
@@ -149,18 +196,21 @@ class ProductRepositoryModel implements ProductRepositoryInterface
             'product_price' => [$condition => 0],
         ];
 
+        $table = $this->bestsellers->getTableByAggregationPeriod($period);
         $this->productCollection->joinTable(
-            ['b' => $this->bestsellers->getMainTable()],
+            ['b' => $table],
             'product_id = entity_id',
             [
                 'product_price' => 'product_price',
+                'period'        => 'period',
             ],
             $joinCond
         );
 
         $this->productCollection
-            ->addOrder('rating_post', Collection::SORT_ORDER_ASC)
-            ->groupByAttribute('entity_id');
+            ->addFieldToFilter('period', ['gteq' => $range['from']])
+            ->addFieldToFilter('period', ['lteq' => $range['to']])
+            ->addOrder('rating_post', Collection::SORT_ORDER_ASC);
 
         $result = $this->processProductCollection($searchCriteria);
 
@@ -181,16 +231,16 @@ class ProductRepositoryModel implements ProductRepositoryInterface
             'store_id' => ['eq' => $storeId],
         ];
 
-        $code = $searchCriteria->getRatingCode();
-        if (!empty($code)) {
-            $rating = $this->rating->getItemByColumnValue('rating_code', $code);
+        $code   = $searchCriteria->getRatingCode();
+        $rating = $this->rating->getItemByColumnValue('rating_code', $code);
 
-            if (!empty($rating)) {
-                // there is something like we are searching
-                $id = $rating->getData('rating_id');
-                $joinCond['rating_id'] = ['eq' => $id];
-            }
+        if (empty($rating) || $rating->isEmpty()) {
+            throw new \Magento\Framework\Exception\InputException(__('Rating code "%s" not found.', $code));
         }
+
+        // there is something like we are searching
+        $id = $rating->getData('rating_id');
+        $joinCond['rating_id'] = ['eq' => $id];
 
         $this->productCollection->joinTable(
             ['r' => $this->ratingAggregated->getMainTable()],
@@ -205,10 +255,7 @@ class ProductRepositoryModel implements ProductRepositoryInterface
 
         $this->productCollection
             ->addOrder('percent', Collection::SORT_ORDER_DESC)
-            ->addOrder('vote_value_sum', Collection::SORT_ORDER_DESC)
-            ->groupByAttribute('entity_id');
-
-
+            ->addOrder('vote_value_sum', Collection::SORT_ORDER_DESC);
 
         $result = $this->processProductCollection($searchCriteria);
 
@@ -241,14 +288,14 @@ class ProductRepositoryModel implements ProductRepositoryInterface
 
         foreach ($searchCriteria->getFilterGroups() as $filterGroup) {
             foreach ($filterGroup->getFilters() as $filter) {
-                if (in_array($filter->getField(), array_keys($allowedAttr), true)) {
+                if (\in_array($filter->getField(), \array_keys($allowedAttr), true)) {
                     // add this attribute to join list and filter
                     $attribute = $allowedAttr[$filter->getField()];
                     $this->productCollection->joinAttribute($filter->getField(), $attribute, 'entity_id', null, 'inner');
 
                     $this->productCollection->addAttributeToFilter(
                         $filter->getField(),
-                        $filter->getValue()
+                        [$filter->getConditionType() => $filter->getValue()]
                     );
                 }
             }
@@ -272,10 +319,12 @@ class ProductRepositoryModel implements ProductRepositoryInterface
             return $product;
         });
 
+        $size = $this->productCollection->getSize();
+
         $result = new ProductSearchResults();
         $result->setItems($items)
             ->setSearchCriteria($searchCriteria)
-            ->setTotalCount($this->productCollection->getSize());
+            ->setTotalCount($size);
 
         return $result;
     }

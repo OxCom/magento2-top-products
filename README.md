@@ -29,7 +29,7 @@ Where ```type``` can be:
 **currentPage** - Current page
 **ratingCode** - filter by rating type. This options is related ony for ```rated``` type. Possible values can be found in ```rating``` table.
 **period** - filter by period. This options is related only for ```selling``` or ```free``` type. Possible values are:
-- yearly - annual report
+- yearly - annual report (default)
 - monthly - monthly report
 - daily - daily report
 
