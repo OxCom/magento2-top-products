@@ -141,17 +141,22 @@ class ProductRepositoryModel implements ProductRepositoryInterface
      */
     protected function getBestsellers($condition, ProductSearchCriteriaInterface $searchCriteria)
     {
-        $allowed = [static::BEST_SELLING_PERIOD_DAILY, static::BEST_SELLING_PERIOD_MONTHLY, static::BEST_SELLING_PERIOD_YEARLY];
+        $allowed = [
+            ProductSearchCriteriaInterface::PERIOD_DAILY,
+            ProductSearchCriteriaInterface::PERIOD_MONTHLY,
+            ProductSearchCriteriaInterface::PERIOD_YEARLY
+        ];
+
         $period = $searchCriteria->getPeriod();
         if (!\in_array($period, $allowed, true)) {
-            $period = static::BEST_SELLING_PERIOD_YEARLY;
+            $period = ProductSearchCriteriaInterface::PERIOD_YEARLY;
         }
 
         $from = new \DateTime();
         $to   = new \DateTime();
 
         switch ($period) {
-            case static::BEST_SELLING_PERIOD_YEARLY:
+            case ProductSearchCriteriaInterface::PERIOD_YEARLY:
                 $from->setDate($from->format('Y'), 1, 1);
                 $from->modify('-1 year');
 
@@ -165,7 +170,7 @@ class ProductRepositoryModel implements ProductRepositoryInterface
                 ];
                 break;
 
-            case static::BEST_SELLING_PERIOD_MONTHLY:
+            case ProductSearchCriteriaInterface::PERIOD_MONTHLY:
                 $from->setDate($from->format('Y'), $from->format('m'), 1);
                 $from->modify('-1 month');
 
@@ -179,7 +184,7 @@ class ProductRepositoryModel implements ProductRepositoryInterface
                 ];
                 break;
 
-            case static::BEST_SELLING_PERIOD_DAILY:
+            case ProductSearchCriteriaInterface::PERIOD_DAILY:
             default:
                 $range = [
                     'from' => $from->format('Y-m-d 00:00:00'),
