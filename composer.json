@@ -3,7 +3,6 @@
   "description": "This is a module that extends Magento2 API to get list of TOP products.",
   "type": "magento2-module",
   "license": "LGPL-3.0",
-  "version": "1.0.0",
   "keywords": [
     "magento2",
     "top products",
