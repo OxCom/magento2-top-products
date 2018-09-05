@@ -157,8 +157,8 @@ class ProductRepositoryModel implements ProductRepositoryInterface
 
         switch ($period) {
             case ProductSearchCriteriaInterface::PERIOD_YEARLY:
+                // from beggining of current year till the end of the current year
                 $from->setDate($from->format('Y'), 1, 1);
-                $from->modify('-1 year');
 
                 $to->modify('+1 year');
                 $to->setDate($to->format('Y'), 1, 1);
@@ -171,11 +171,11 @@ class ProductRepositoryModel implements ProductRepositoryInterface
                 break;
 
             case ProductSearchCriteriaInterface::PERIOD_MONTHLY:
+                // from beggining of current month till the end of the current moth
                 $from->setDate($from->format('Y'), $from->format('m'), 1);
-                $from->modify('-1 month');
 
+                $to->setDate($to->format('Y'), $to->format('m'), 1);
                 $to->modify('+1 month');
-                $to->setDate($to->format('Y'), $from->format('m'), 1);
                 $to->modify('-1 day');
 
                 $range = [
@@ -186,6 +186,7 @@ class ProductRepositoryModel implements ProductRepositoryInterface
 
             case ProductSearchCriteriaInterface::PERIOD_DAILY:
             default:
+                // from beggining of current day till the end of the current day
                 $range = [
                     'from' => $from->format('Y-m-d 00:00:00'),
                     'to'   => $to->format('Y-m-d 23:59:59'),
