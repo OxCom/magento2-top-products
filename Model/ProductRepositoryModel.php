@@ -155,6 +155,9 @@ class ProductRepositoryModel implements ProductRepositoryInterface
         $from = new \DateTime();
         $to   = new \DateTime();
 
+        $from->setTime(0, 0, 0, 0);
+        $to->setTime(0, 0, 0, 0);
+
         switch ($period) {
             case ProductSearchCriteriaInterface::PERIOD_YEARLY:
                 // from beggining of current year till the end of the current year
@@ -209,6 +212,7 @@ class ProductRepositoryModel implements ProductRepositoryInterface
             [
                 'product_price' => 'product_price',
                 'period'        => 'period',
+                'rating_pos'    => 'rating_pos',
             ],
             $joinCond
         );
@@ -216,7 +220,7 @@ class ProductRepositoryModel implements ProductRepositoryInterface
         $this->productCollection
             ->addFieldToFilter('period', ['gteq' => $range['from']])
             ->addFieldToFilter('period', ['lteq' => $range['to']])
-            ->addOrder('rating_post', Collection::SORT_ORDER_ASC);
+            ->addOrder('rating_pos', Collection::SORT_ORDER_DESC);
 
         $result = $this->processProductCollection($searchCriteria);
 
@@ -260,8 +264,8 @@ class ProductRepositoryModel implements ProductRepositoryInterface
         );
 
         $this->productCollection
-            ->addOrder('percent', Collection::SORT_ORDER_DESC)
-            ->addOrder('vote_value_sum', Collection::SORT_ORDER_DESC);
+            ->addOrder('vote_value_sum', Collection::SORT_ORDER_DESC)
+            ->addOrder('percent', Collection::SORT_ORDER_DESC);
 
         $result = $this->processProductCollection($searchCriteria);
 
