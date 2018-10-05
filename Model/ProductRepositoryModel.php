@@ -252,20 +252,46 @@ class ProductRepositoryModel implements ProductRepositoryInterface
         $id = $rating->getData('rating_id');
         $joinCond['rating_id'] = ['eq' => $id];
 
+        // $ra - alias for rating table
+        $ra = 'r';
+        /**
+         * To create more reliable order based on number of votes and quality of votes we have to introduce product
+         * weight, because product with 1 vote and 5 stars cannot be at first position. Please see link to get more
+         * information about this.
+         *
+         * At current realisation
+         * q        - 'vote_count' column
+         * P = 0.5
+         * Q = 5    - becase we have 5 star system
+         * p        - 'vote_value_sum' / 'vote_count'
+         *
+         * @link https://math.stackexchange.com/questions/942738/algorithm-to-calculate-rating-based-on-multiple-reviews-using-both-review-score
+         */
+        $q = "`{$ra}`.vote_count";
+        $P = 0.5;
+        $Q = 5;
+        $p = "(`{$ra}`.vote_value_sum / {$q})";
+        $weight = "ROUND(({$P} * {$p} + 10 * (1 - {$P}) * (1 -  EXP( -({$q}) / {$Q} ))), 2)";
+        $this->productCollection
+            ->getSelect()
+            ->columns([
+                'score' => new \Zend_Db_Expr($weight)
+            ]);
+
         $this->productCollection->joinTable(
-            ['r' => $this->ratingAggregated->getMainTable()],
+            [$ra => $this->ratingAggregated->getMainTable()],
             'entity_pk_value = entity_id',
             [
                 'rating_id'      => 'rating_id',
-                'percent'        => 'percent',
+                'vote_count'     => 'vote_count',
                 'vote_value_sum' => 'vote_value_sum',
             ],
             $joinCond
         );
 
         $this->productCollection
-            ->addOrder('vote_value_sum', Collection::SORT_ORDER_DESC)
-            ->addOrder('percent', Collection::SORT_ORDER_DESC);
+            ->getSelect()
+            ->order('score ' . Collection::SORT_ORDER_DESC);
 
         $result = $this->processProductCollection($searchCriteria);
 
