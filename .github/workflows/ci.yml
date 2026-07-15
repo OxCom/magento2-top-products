@@ -12,8 +12,8 @@ env:
   PHP_EXTENSIONS: bcmath, ctype, curl, dom, gd, iconv, intl, mbstring, openssl, pdo_mysql, simplexml, soap, sodium, xsl, zip
 
 jobs:
-  security:
-    name: Security / audit
+  gitleaks:
+    name: Security / gitleaks
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,11 +27,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  trufflehog:
+    name: Security / trufflehog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
       - name: TruffleHog
         uses: trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55 # v3.95.9
         with:
           path: ./
           extra_args: --results=verified,unknown
+
+  composer-audit:
+    name: Security / composer audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup PHP
         uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
@@ -44,7 +62,7 @@ jobs:
         run: composer config repositories.magento composer https://repo.mage-os.org/
 
       - name: Composer dependency audit
-        run: composer audit --no-dev --format=table
+        run: composer audit --no-dev --locked --format=table
 
   phpcs:
     name: Lint / phpcs
