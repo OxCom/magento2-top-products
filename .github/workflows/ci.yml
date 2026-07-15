@@ -61,8 +61,11 @@ jobs:
       - name: Use Mage-OS mirror
         run: composer config repositories.magento composer https://repo.mage-os.org/
 
+      - name: Install dependencies
+        run: composer update --no-interaction --no-progress --prefer-dist --no-scripts
+
       - name: Composer dependency audit
-        run: composer audit --no-dev --locked --format=table
+        run: composer audit --no-dev --format=table
 
   phpcs:
     name: Lint / phpcs
