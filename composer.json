@@ -53,7 +53,8 @@
     "sort-packages": true,
     "allow-plugins": {
       "dealerdirect/phpcodesniffer-composer-installer": true,
-      "magento/composer-dependency-version-audit-plugin": true
+      "magento/composer-dependency-version-audit-plugin": true,
+      "mage-os/composer-dependency-version-audit-plugin": true
     }
   },
   "repositories": {
