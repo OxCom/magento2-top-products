@@ -68,8 +68,8 @@ class ProductRepositoryModel implements ProductRepositoryInterface
      * @param \Magento\Store\Model\StoreManager                                                 $storeManager
      * @param \Magento\Review\Model\ResourceModel\Rating\Collection                             $rating
      * @param \OxCom\MagentoTopProducts\Model\ResourceModel\Rating\Option\Aggregated\Collection $ratingAggregated
-     * @param \Magento\Catalog\Api\ProductAttributeRepositoryInterface                          $metadataServiceInterface
-     * @param \Magento\Framework\Api\SearchCriteriaBuilder                                      $searchCriteriaBuilder
+     * @param \Magento\Catalog\Api\ProductAttributeRepositoryInterface $metadataServiceInterface
+     * @param \Magento\Framework\Api\SearchCriteriaBuilder             $searchCriteriaBuilder
      */
     public function __construct(
         Bestsellers $bestsellers,
@@ -102,10 +102,10 @@ class ProductRepositoryModel implements ProductRepositoryInterface
      * @return \OxCom\MagentoTopProducts\Api\Data\ProductSearchResultsInterface
      * @throws \Magento\Framework\Exception\LocalizedException
      */
-    public function getList($type, ProductSearchCriteriaInterface $searchCriteria = null)
+    public function getList($type, ?ProductSearchCriteriaInterface $searchCriteria = null)
     {
         $allowed = [static::FILTER_TYPE_TOP_SELLING, static::FILTER_TYPE_TOP_FREE, static::FILTER_TYPE_TOP_RATED];
-        $type    = mb_strtolower($type);
+        $type    = \mb_strtolower($type);
 
         if (empty($searchCriteria)) {
             $searchCriteria = new ProductSearchCriteria();
@@ -125,8 +125,8 @@ class ProductRepositoryModel implements ProductRepositoryInterface
                 break;
 
             default:
-                $allowed = implode(', ', $allowed);
-                $phrase  = __('Requested type "%s" doesn\'t exist. Allowed: %s', $type, $allowed);
+                $allowed = \implode(', ', $allowed);
+                $phrase  = \__('Requested type "%s" doesn\'t exist. Allowed: %s', $type, $allowed);
                 throw new \Magento\Framework\Exception\InputException($phrase);
         }
 
@@ -245,7 +245,7 @@ class ProductRepositoryModel implements ProductRepositoryInterface
         $rating = $this->rating->getItemByColumnValue('rating_code', $code);
 
         if (empty($rating) || $rating->isEmpty()) {
-            throw new \Magento\Framework\Exception\InputException(__('Rating code "%s" not found.', $code));
+            throw new \Magento\Framework\Exception\InputException(\__('Rating code "%s" not found.', $code));
         }
 
         // there is something like we are searching
@@ -327,7 +327,13 @@ class ProductRepositoryModel implements ProductRepositoryInterface
                 if (\in_array($filter->getField(), \array_keys($allowedAttr), true)) {
                     // add this attribute to join list and filter
                     $attribute = $allowedAttr[$filter->getField()];
-                    $this->productCollection->joinAttribute($filter->getField(), $attribute, 'entity_id', null, 'inner');
+                    $this->productCollection->joinAttribute(
+                        $filter->getField(),
+                        $attribute,
+                        'entity_id',
+                        null,
+                        'inner'
+                    );
 
                     $this->productCollection->addAttributeToFilter(
                         $filter->getField(),

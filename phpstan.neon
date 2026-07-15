@@ -1,0 +1,17 @@
+parameters:
+    level: 1
+
+    paths:
+        - Api
+        - Model
+        - Test
+        - registration.php
+    excludePaths:
+        - vendor
+
+    parallel:
+        jobSize: 16
+        maximumNumberOfProcesses: 8
+        minimumNumberOfJobsPerProcess: 2
+
+    treatPhpDocTypesAsCertain: false

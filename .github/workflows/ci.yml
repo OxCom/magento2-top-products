@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PHP_EXTENSIONS: bcmath, ctype, curl, dom, gd, iconv, intl, mbstring, openssl, pdo_mysql, simplexml, soap, sodium, xsl, zip
+
+jobs:
+  phpcs:
+    name: Lint / phpcs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: '8.3'
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+
+      - name: Use Mage-OS mirror
+        run: composer config repositories.magento composer https://repo.mage-os.org/
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-8.3-${{ hashFiles('composer.json') }}
+          restore-keys: composer-8.3-
+
+      - name: Install dependencies
+        run: composer update --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Run phpcs
+        run: composer phpcs
+
+  phpstan:
+    name: Lint / phpstan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: '8.3'
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+
+      - name: Use Mage-OS mirror
+        run: composer config repositories.magento composer https://repo.mage-os.org/
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-8.3-${{ hashFiles('composer.json') }}
+          restore-keys: composer-8.3-
+
+      - name: Install dependencies
+        run: composer update --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Run phpstan
+        run: composer phpstan
+
+  tests:
+    name: Tests / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+
+      - name: Use Mage-OS mirror
+        run: composer config repositories.magento composer https://repo.mage-os.org/
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ matrix.php }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ matrix.php }}-
+
+      # magento/framework platform requirement tops out below 8.5;
+      # module code targets 8.5 ahead of official Magento support
+      - name: Install dependencies
+        run: |
+          FLAGS=""
+          if [ "${{ matrix.php }}" = "8.5" ]; then
+            FLAGS="--ignore-platform-req=php+"
+          fi
+          composer update --no-interaction --no-progress --prefer-dist --no-scripts $FLAGS
+
+      - name: Run tests
+        run: composer test

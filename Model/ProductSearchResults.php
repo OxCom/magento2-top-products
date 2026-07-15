@@ -12,9 +12,9 @@ use OxCom\MagentoTopProducts\Api\Data\ProductSearchResultsInterface;
  */
 class ProductSearchResults extends AbstractSimpleObject implements ProductSearchResultsInterface
 {
-    const KEY_ITEMS           = 'items';
-    const KEY_SEARCH_CRITERIA = 'search_criteria';
-    const KEY_TOTAL_COUNT     = 'total_count';
+    public const KEY_ITEMS           = 'items';
+    public const KEY_SEARCH_CRITERIA = 'search_criteria';
+    public const KEY_TOTAL_COUNT     = 'total_count';
 
     /**
      * Get items

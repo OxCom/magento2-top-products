@@ -37,15 +37,17 @@ class ProductSearchCriteria extends SearchCriteria implements ProductSearchCrite
         $allowed = [static::PERIOD_DAILY, static::PERIOD_MONTHLY, static::PERIOD_YEARLY];
 
         if (empty($period)) {
-            $period = static::PERIOD_DAILY;
-        } else {
-            if (!in_array($period, $allowed, true)) {
-                $allowed = implode(', ', $allowed);
-                $msg     = 'Requested period "%s" doesn\'t exist. Allowed: %s. Default: %s';
-                $phrase  = __($msg, $period, $allowed, static::PERIOD_DAILY);
+            $this->period = static::PERIOD_DAILY;
 
-                throw new \Magento\Framework\Exception\InputException($phrase);
-            }
+            return $this;
+        }
+
+        if (!\in_array($period, $allowed, true)) {
+            $allowed = \implode(', ', $allowed);
+            $msg     = 'Requested period "%s" doesn\'t exist. Allowed: %s. Default: %s';
+            $phrase  = \__($msg, $period, $allowed, static::PERIOD_DAILY);
+
+            throw new \Magento\Framework\Exception\InputException($phrase);
         }
 
         $this->period = $period;

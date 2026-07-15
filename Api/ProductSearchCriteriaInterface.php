@@ -9,9 +9,9 @@ namespace OxCom\MagentoTopProducts\Api;
  */
 interface ProductSearchCriteriaInterface
 {
-    const PERIOD_YEARLY  = 'yearly';
-    const PERIOD_MONTHLY = 'monthly';
-    const PERIOD_DAILY   = 'daily';
+    public const PERIOD_YEARLY  = 'yearly';
+    public const PERIOD_MONTHLY = 'monthly';
+    public const PERIOD_DAILY   = 'daily';
 
     /**
      * Get a list of filter groups.
@@ -26,7 +26,7 @@ interface ProductSearchCriteriaInterface
      * @param \Magento\Framework\Api\Search\FilterGroup[] $filterGroups
      * @return $this
      */
-    public function setFilterGroups(array $filterGroups = null);
+    public function setFilterGroups(?array $filterGroups = null);
 
     /**
      * Get page size.

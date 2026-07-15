@@ -1,5 +1,7 @@
 # Magento2 Top Products API
 
+[![CI](https://github.com/OxCom/magento2-top-products/actions/workflows/ci.yml/badge.svg)](https://github.com/OxCom/magento2-top-products/actions/workflows/ci.yml)
+
 This is a module that extends Magento2 API to get list of TOP products by next filters:
  - TOP selling products
  - TOP Free products
@@ -8,7 +10,11 @@ This is a module that extends Magento2 API to get list of TOP products by next f
 Top selling and free products are fetching from Magento2 reports.
 
 Top rated products are fetching from Rates module and results are based on aggregated data.
- 
+
+## Requirements
+- PHP 8.2, 8.3, 8.4 or 8.5
+- Magento 2.4.6+ (magento/framework ^103.0)
+
 ## Install
 ```bash
 $ composer require oxcom/magento2-top-products
